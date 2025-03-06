@@ -46,8 +46,8 @@ const options = {
    let intersect =new mongoose.model('intersect', intersectSchema);
    console.log(intersect)
    try {
-	   
-	 let intersect_a = await intersect.insertOne(query.intersect);
+	  
+	 let intersect_a = await intersect.insertOne(query.intersect[1]);
 	 let intersect_b = await intersect.insertOne(query.intersect[0]);
 	// let intersect_c = await intersect.insertOne(query);
 	// console.log(intersect_a);
