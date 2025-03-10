@@ -1,19 +1,20 @@
 <?php
 include_once 'DB.php';
-class ManageBD extends DB{
-  public function getQueries(){
+class ManageBD extends DB
+{
+	public function getQueries()
+	{
 
-	$intersect = $this->connect()->query("
-    SELECT * FROM departamento
-");
- 
-	
-	$queries = array (
-		"intersect"=>$intersect
-	);
-	
+		$student = $this->connect()->query("
+			SELECT * from student
+		");
+
+		$queries = array(
+			"student" => $student
+		);
+
 		return $queries;
-	
+
 	}
 }
 ?>
