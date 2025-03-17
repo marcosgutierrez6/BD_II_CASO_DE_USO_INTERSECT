@@ -2,72 +2,144 @@ import mongoose from 'mongoose';
 import { getdata } from './api.js';
 const { Schema, model } = mongoose;
 let uri = 'mongodb://127.0.0.1:27017/intersect';
-//trayendo la data del api
+
+// Trayendo la data del API
 const query = await getdata().then(data => {
   console.log(data);
   return data;
 }).catch(error => {
-  console.log('no va');
+  console.log('No se pudo obtener la data');
   process.exit(0);
 });
 
-/*Valorar el caso en que query sea un array de strins como*/
-/*let query = {
-  intersect: ["DARWIN"], // Ahora es un array de strings
-};*/
 console.log(query);
+
 const options = {
-  autoIndex: false, // Don't build indexes
-  maxPoolSize: 10, // Maintain up to 10 socket connections
-  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-  family: 4 // Use IPv4, skip trying IPv6
+  autoIndex: true, // No construir índices automáticamente
+  maxPoolSize: 10, // Mantener hasta 10 conexiones al servidor
+  serverSelectionTimeoutMS: 5000, // Intentar enviar operaciones por 5 segundos
+  socketTimeoutMS: 45000, // Cerrar los sockets después de 45 segundos de inactividad
+  family: 4 // Usar IPv4, evitar IPv6
 };
+
 mongoose.connect(uri, options).then(
   () => {
-    console.log('se ha conectado exitosamente')
+    console.log('Conexión exitosa');
   },
-  err => { console.log('no se ha podido conectar') }
-);
-    
-const intersectSchema = new mongoose.Schema({
-  ID: { type: Number },
-  name: { type: String },
-  tot_cred: { type: Number },
-  matricula: {
-    type: [String], // Corrected to array of strings
-    enum: ['Primera', 'Segunda', 'Tercera'] // Now this contains "Primera", "Segunda", and "Tercera"
-  },
-  status: {
-    type: String,
-    enum: ['No matriculado', 'En proceso', 'Matriculado', 'Otro'],
-    default: 'No matriculado' // Default status is 'No matriculado'
-  },
-  semester: { type: String },
-  year: { type: Number, default: new Date().getFullYear() }, // Default to current year
-  grade: { type: String }
-});
-
-// Define the schema for Alumno (Student Information)
-const alumnoSchema = new mongoose.Schema({
-  ID: { type: Number }, // Numeric ID specified by the student
-  name: { type: String },
-  last_name: { type: String },
-  dni: { type: String } // Alphanumeric DNI
-});
-
-// Create the models based on the schemas
-let intersect =new mongoose.model('intersect', intersectSchema);
-let alumno= new mongoose.model('alumno', alumnoSchema);
-
-// Function to create the records in the database
-  try {
-    let intersect_a = await intersect.insertMany(query.intersect);
-    let alumno_a = await alumno.insert(query.alumno);
-    console.log(query);
-    
-    process.exit(0);
-  } catch (e) {
-    console.log('An error occurred:', e.message);
-    process.exit(1); // Exit with an error code
+  err => { 
+    console.log('No se pudo conectar');
   }
+);
+
+// Definir el esquema de courses
+const courseSchema = new mongoose.Schema({
+  course_id: {
+    type: String,
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  dept_name: {
+    type: String,
+    required: true
+  },
+  credits: {
+    type: Number,
+    required: true
+  }
+});
+
+// Definir el esquema de takes
+const takeSchema = new mongoose.Schema({
+  ID: {
+    type: String,
+    required: true
+  },
+  course_id: {
+    type: String,
+    required: true
+  },
+  sec_id: {
+    type: String,
+    required: true
+  },
+  semester: {
+    type: String,
+    required: true
+  },
+  year: {
+    type: Number,
+    required: true
+  },
+  grade: {
+    type: String,
+    required: false, // Esto puede ser nulo, por lo que no es obligatorio
+    default: null
+  }
+});
+
+// Crear un índice compuesto sobre course_id y year
+takeSchema.index({ course_id: 1, year: 1 }); // 1 para índice ascendente
+
+// Crear los modelos
+let course = new mongoose.model('course', courseSchema);
+let takes = new mongoose.model('takes', takeSchema);
+
+// Agregación: Cursos Agrupados por Créditos y por Departamento
+const coursesGroupedByCreditsAndDepartment = async () => {
+  try {
+    const result = await course.aggregate([
+      {
+        $group: {
+          _id: { dept_name: "$dept_name", credits: "$credits" }, // Agrupar por departamento y créditos
+          totalCourses: { $sum: 1 } // Contar el número de cursos por departamento y créditos
+        }
+      },
+      {
+        $sort: { "_id.dept_name": 1, "_id.credits": 1 } // Ordenar por departamento y créditos
+      }
+    ]);
+    console.log("Cursos agrupados por créditos y departamento:", result);
+  } catch (error) {
+    console.error("Error en la agregación de cursos agrupados por créditos y departamento:", error);
+  }
+};
+
+// Agregación: Número de Cursos Tomados por Año
+const coursesTakenByYear = async () => {
+  try {
+    const result = await takes.aggregate([
+      {
+        $group: {
+          _id: "$year", // Agrupar por año
+          totalCoursesTaken: { $sum: 1 } // Contar el número de cursos tomados por año
+        }
+      },
+      {
+        $sort: { _id: 1 } // Ordenar por año de menor a mayor
+      }
+    ]);
+    console.log("Número de cursos tomados por año:", result);
+  } catch (error) {
+    console.error("Error en la agregación de cursos tomados por año:", error);
+  }
+};
+
+// Función para insertar los datos en la base de datos y ejecutar las agregaciones
+try {
+  let intersect_a = await course.insertMany(query.course);
+  let intersect_b = await takes.insertMany(query.takes);
+
+  console.log(query);
+  
+  // Ejecutar las agregaciones
+  await coursesGroupedByCreditsAndDepartment();
+  await coursesTakenByYear();
+
+  process.exit(0);
+} catch (e) {
+  console.log('Ha ocurrido un error:', e.message);
+  process.exit(1); // Salir con un código de error
+}

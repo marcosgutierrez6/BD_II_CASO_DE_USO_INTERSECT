@@ -5,12 +5,17 @@ class ManageBD extends DB
 	public function getQueries()
 	{
 
-		$student = $this->connect()->query("
-			SELECT * from student
+		$courses = $this->connect()->query("
+			SELECT * FROM course;
+		");
+
+		$takes = $this->connect()->query("
+			SELECT * FROM takes;
 		");
 
 		$queries = array(
-			"student" => $student
+			"course" => $courses,
+			"takes" => $takes
 		);
 
 		return $queries;
