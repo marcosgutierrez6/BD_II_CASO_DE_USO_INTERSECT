@@ -5,22 +5,12 @@ class ManageBD extends DB
 	public function getQueries()
 	{
 
-		$courses = $this->connect()->query("
-			SELECT * FROM course;
-		");
-
-		$takes = $this->connect()->query("
-			SELECT * FROM takes;
-		");
-
-		$mongodbObjetcs = $this->connect()->query("
-			SELECT * FROM mongodb_objects
+		$json = $this->connect()->query("
+			SELECT * FROM student_json;
 		");
 
 		$queries = array(
-			"course" => $courses,
-			"takes" => $takes,
-			"json" => $mongodbObjetcs
+			"json" => $json
 		);
 
 		return $queries;
