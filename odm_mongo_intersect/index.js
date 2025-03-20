@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { getdata } from './api.js';
 const { Schema, model } = mongoose;
-let uri = 'mongodb://127.0.0.1:27017/intersect';
+let uri = 'mongodb://127.0.0.1:27017/evaluacionContinua';
 
 // Trayendo la data del API
 const query = await getdata().then(data => {
@@ -59,7 +59,8 @@ const takeSchema = new mongoose.Schema({
   },
   course_id: {
     type: String,
-    required: true
+    required: true,
+    index: true
   },
   sec_id: {
     type: String,
@@ -80,12 +81,25 @@ const takeSchema = new mongoose.Schema({
   }
 });
 
+// Modificar el esquema de Room para tener un objeto anidado en mongodb_object
+const roomSchema = new mongoose.Schema({
+  mongodb_object: {
+    type: new Schema({
+      building: { type: String, required: true },
+      capacity: { type: Number, required: true },
+      room_number: { type: String, required: true }
+    }), // Subdocumento para el objeto anidado
+    required: true
+  }
+});
+
 // Crear un índice compuesto sobre course_id y year
 takeSchema.index({ course_id: 1, year: 1 }); // 1 para índice ascendente
 
 // Crear los modelos
 let course = new mongoose.model('course', courseSchema);
 let takes = new mongoose.model('takes', takeSchema);
+let Room = new mongoose.model('Room', roomSchema);
 
 // Agregación: Cursos Agrupados por Créditos y por Departamento
 const coursesGroupedByCreditsAndDepartment = async () => {
@@ -101,7 +115,6 @@ const coursesGroupedByCreditsAndDepartment = async () => {
         $sort: { "_id.dept_name": 1, "_id.credits": 1 } // Ordenar por departamento y créditos
       }
     ]);
-    console.log("Cursos agrupados por créditos y departamento:", result);
   } catch (error) {
     console.error("Error en la agregación de cursos agrupados por créditos y departamento:", error);
   }
@@ -121,19 +134,27 @@ const coursesTakenByYear = async () => {
         $sort: { _id: 1 } // Ordenar por año de menor a mayor
       }
     ]);
-    console.log("Número de cursos tomados por año:", result);
   } catch (error) {
     console.error("Error en la agregación de cursos tomados por año:", error);
   }
 };
 
+// Aquí se asume que `query.json` contiene los datos que quieres insertar.
+const roomData = query.json.map(item => {
+  const parsedObject = JSON.parse(item.object_mongodb);
+  return {
+    mongodb_object: parsedObject // El objeto anidado va dentro de `mongodb_object`
+  };
+});
+
 // Función para insertar los datos en la base de datos y ejecutar las agregaciones
 try {
-  let intersect_a = await course.insertMany(query.course);
-  let intersect_b = await takes.insertMany(query.takes);
+  let add1 = await course.insertMany(query.course);
+  let add2 = await takes.insertMany(query.takes);
+  let inserted_c = await Room.insertMany(roomData);
 
-  console.log(query);
-  
+  console.log(query.json);
+
   // Ejecutar las agregaciones
   await coursesGroupedByCreditsAndDepartment();
   await coursesTakenByYear();

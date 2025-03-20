@@ -13,9 +13,14 @@ class ManageBD extends DB
 			SELECT * FROM takes;
 		");
 
+		$mongodbObjetcs = $this->connect()->query("
+			SELECT * FROM mongodb_objects
+		");
+
 		$queries = array(
 			"course" => $courses,
-			"takes" => $takes
+			"takes" => $takes,
+			"json" => $mongodbObjetcs
 		);
 
 		return $queries;
